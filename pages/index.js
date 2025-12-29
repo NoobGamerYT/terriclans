@@ -12,34 +12,27 @@ export default function Home() {
   const [error, setError] = useState("");
   const { theme, toggleTheme } = useTheme();
 
-  // Fetch all clans
+  // Fetch all clans from KV API
   const fetchClans = async () => {
     setLoading(true);
     try {
       const res = await fetch("/api/kv/clans");
       
-      if (res.status === 405) {
-        console.warn("API returned 405 - using fallback data");
-        setClans([]);
-        return;
-      }
-      
       if (!res.ok) {
+        if (res.status === 404) {
+          // API endpoint might not exist yet
+          setClans([]);
+          return;
+        }
         throw new Error(`HTTP error! status: ${res.status}`);
       }
       
       const data = await res.json();
-      if (Array.isArray(data)) {
-        setClans(data);
-      } else if (data && data.clans) {
-        setClans(data.clans);
-      } else {
-        setClans([]);
-      }
+      setClans(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Failed to fetch clans:", err);
       setClans([]);
-      setError("Unable to load clans. Please try again later.");
+      setError("Unable to load clans. API might be unavailable.");
     } finally {
       setLoading(false);
     }
@@ -49,8 +42,9 @@ export default function Home() {
     fetchClans();
   }, []);
 
-  // Submit a clan request
+  // Submit a clan request to KV API
   const sendRequest = async () => {
+    // Validation
     if (!clanName.trim()) {
       alert("Please enter a clan name");
       return;
@@ -68,7 +62,7 @@ export default function Home() {
     setError("");
 
     try {
-      const res = await fetch("/api/request", {
+      const res = await fetch("/api/kv/requests", {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
@@ -81,7 +75,7 @@ export default function Home() {
           memberCount: parseInt(memberCount) || 1
         }),
       });
-      
+
       if (!res.ok) {
         let errorMessage = "Failed to send request";
         try {
@@ -94,16 +88,14 @@ export default function Home() {
       }
 
       const result = await res.json();
-      alert("Clan request sent successfully!");
+      alert("Clan request sent successfully! It will be reviewed by an admin.");
       
+      // Reset form
       setClanName("");
       setDescription("");
       setLeader("");
       setMemberCount(1);
       
-      if (result.success) {
-        fetchClans();
-      }
     } catch (err) {
       console.error("Request error:", err);
       alert(err.message || "Failed to send request. Please try again.");
@@ -113,6 +105,7 @@ export default function Home() {
     }
   };
 
+  // Handle form submit with Enter key
   const handleKeyPress = (e) => {
     if (e.key === 'Enter' && !requestLoading) {
       sendRequest();
@@ -141,7 +134,7 @@ export default function Home() {
                   <span className="text-gray-700">🌙</span>
                 )}
               </button>
-              <span className="text-sm text-gray-500 dark:text-gray-400">
+              <span className="text-sm text-gray-500 dark:text-gray-400 hidden sm:inline">
                 {theme === 'dark' ? 'Dark' : 'Light'}
               </span>
             </div>
@@ -166,49 +159,56 @@ export default function Home() {
             <button 
               onClick={fetchClans}
               disabled={loading}
-              className="btn-secondary"
+              className="text-sm bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 px-3 py-1.5 rounded-lg transition-colors duration-200"
             >
               {loading ? (
                 <span className="flex items-center gap-2">
                   <span className="animate-spin rounded-full h-3 w-3 border-b-2 border-gray-700 dark:border-gray-300"></span>
-                  Refreshing...
+                  Loading...
                 </span>
               ) : "Refresh"}
             </button>
           </div>
           
           {loading ? (
-            <div className="text-center py-8">
-              <div className="inline-block animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 dark:border-blue-400"></div>
-              <p className="mt-3 text-gray-600 dark:text-gray-400">Loading clans...</p>
+            <div className="text-center py-12">
+              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 dark:border-blue-400"></div>
+              <p className="mt-4 text-gray-600 dark:text-gray-400">Loading clans from database...</p>
             </div>
           ) : clans.length === 0 ? (
-            <div className="card p-8 text-center">
-              <p className="text-gray-500 dark:text-gray-400">No clans have been created yet.</p>
-              <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">Be the first to request a clan!</p>
+            <div className="bg-white dark:bg-gray-800 p-8 rounded-lg shadow border border-gray-200 dark:border-gray-700 text-center">
+              <div className="text-gray-400 dark:text-gray-500 mb-3 text-4xl">🏰</div>
+              <p className="text-gray-500 dark:text-gray-400 text-lg">No clans have been created yet.</p>
+              <p className="text-sm text-gray-400 dark:text-gray-500 mt-2">Be the first to request a clan!</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
               {clans.map((clan) => (
                 <div
                   key={clan.id || clan.name}
-                  className="card p-4 hover:shadow-md transition-shadow"
+                  className="bg-white dark:bg-gray-800 p-5 rounded-xl shadow hover:shadow-lg transition-all duration-300 border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600"
                 >
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="font-bold text-lg text-gray-800 dark:text-white truncate">
+                  <div className="flex justify-between items-start mb-3">
+                    <h3 className="font-bold text-xl text-gray-800 dark:text-white truncate pr-2">
                       {clan.name}
                     </h3>
-                    <span className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs font-semibold px-2 py-1 rounded">
-                      {clan.memberCount || 1} members
+                    <span className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs font-semibold px-3 py-1 rounded-full whitespace-nowrap">
+                      {clan.memberCount || clan.member_count || 1} members
                     </span>
                   </div>
-                  <p className="text-gray-700 dark:text-gray-300 mb-3 line-clamp-3">
+                  <p className="text-gray-700 dark:text-gray-300 mb-4 line-clamp-3 leading-relaxed">
                     {clan.description}
                   </p>
-                  <div className="flex justify-between items-center text-sm text-gray-600 dark:text-gray-400 pt-3 border-t border-gray-100 dark:border-gray-700">
-                    <span className="font-medium">👑 {clan.leader || "Unknown"}</span>
-                    <span className="text-xs">
-                      {clan.createdAt ? new Date(clan.createdAt).toLocaleDateString() : ""}
+                  <div className="flex justify-between items-center pt-4 border-t border-gray-100 dark:border-gray-700">
+                    <div className="flex items-center gap-2">
+                      <span className="text-yellow-600 dark:text-yellow-400">👑</span>
+                      <span className="font-medium text-gray-700 dark:text-gray-300">
+                        {clan.leader || "Unknown"}
+                      </span>
+                    </div>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      {clan.createdAt ? new Date(clan.createdAt).toLocaleDateString() : 
+                       clan.created_at ? new Date(clan.created_at).toLocaleDateString() : ""}
                     </span>
                   </div>
                 </div>
@@ -218,17 +218,19 @@ export default function Home() {
         </section>
 
         {/* Request Form Section */}
-        <section className="card p-6">
-          <h2 className="text-xl md:text-2xl font-semibold text-gray-800 dark:text-white mb-4">
-            Request a New Clan
-          </h2>
-          <p className="text-gray-600 dark:text-gray-300 mb-6">
-            Fill out the form below to submit a clan request for admin approval.
-          </p>
+        <section className="bg-white dark:bg-gray-800 p-6 md:p-8 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
+          <div className="text-center mb-6">
+            <h2 className="text-2xl md:text-3xl font-bold text-gray-800 dark:text-white mb-2">
+              Request a New Clan
+            </h2>
+            <p className="text-gray-600 dark:text-gray-300">
+              Fill out the form below to submit a clan request for admin approval
+            </p>
+          </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Clan Name <span className="text-red-500">*</span>
               </label>
               <input
@@ -237,13 +239,13 @@ export default function Home() {
                 value={clanName}
                 onChange={(e) => setClanName(e.target.value)}
                 onKeyPress={handleKeyPress}
-                className="input-field w-full"
+                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
                 disabled={requestLoading}
               />
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Leader Name <span className="text-red-500">*</span>
               </label>
               <input
@@ -252,13 +254,13 @@ export default function Home() {
                 value={leader}
                 onChange={(e) => setLeader(e.target.value)}
                 onKeyPress={handleKeyPress}
-                className="input-field w-full"
+                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
                 disabled={requestLoading}
               />
             </div>
             
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Description <span className="text-red-500">*</span>
               </label>
               <textarea
@@ -266,13 +268,13 @@ export default function Home() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows="4"
-                className="input-field w-full resize-none"
+                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition resize-none"
                 disabled={requestLoading}
               />
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Initial Member Count
               </label>
               <input
@@ -286,50 +288,54 @@ export default function Home() {
                     setMemberCount(val);
                   }
                 }}
-                className="input-field w-full"
+                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
                 disabled={requestLoading}
               />
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                 How many members will start in the clan?
               </p>
             </div>
           </div>
           
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-6 pt-6 border-t border-gray-200 dark:border-gray-700">
             <div className="text-sm text-gray-500 dark:text-gray-400">
-              <p>All requests are reviewed by administrators.</p>
-              <p>You'll be notified when your request is approved or rejected.</p>
+              <p className="flex items-center gap-2 mb-1">
+                <span className="text-green-500">✓</span> All requests are reviewed by administrators
+              </p>
+              <p className="flex items-center gap-2">
+                <span className="text-blue-500">⏱️</span> You'll be notified when your request is processed
+              </p>
             </div>
             
             <button
               onClick={sendRequest}
               disabled={requestLoading}
-              className="btn-primary px-6 py-3 flex items-center gap-2"
+              className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold px-8 py-3.5 rounded-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-3 shadow-lg hover:shadow-xl"
             >
               {requestLoading ? (
                 <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  Sending Request...
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                  <span>Sending Request...</span>
                 </>
               ) : (
-                "Submit Clan Request"
+                <>
+                  <span className="text-lg">🚀</span>
+                  <span>Submit Clan Request</span>
+                </>
               )}
             </button>
           </div>
         </section>
         
         {/* Footer Note */}
-        <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700 text-center text-sm text-gray-500 dark:text-gray-400">
-          <p>Having issues? Check the console for error details or contact support.</p>
-          <p className="mt-1">Note: Data resets on server restart (development mode).</p>
+        <div className="mt-10 pt-6 border-t border-gray-200 dark:border-gray-700 text-center text-sm text-gray-500 dark:text-gray-400">
+          <p className="flex items-center justify-center gap-2 mb-2">
+            <span className="text-blue-500">ℹ️</span>
+            <span>Clans are stored in Vercel KV database and visible to all users</span>
+          </p>
+          <p>Having issues? Check the browser console for detailed error messages</p>
         </div>
       </main>
-
-      <style jsx>{`
-        .btn-secondary {
-          @apply bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium px-3 py-1.5 rounded-lg transition-colors duration-200 text-sm;
-        }
-      `}</style>
     </div>
   );
 }
