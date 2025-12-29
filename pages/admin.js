@@ -64,6 +64,21 @@ export default function Admin() {
     }
   };
 
+    useEffect(() => {
+    // Check if already logged in via sessionStorage
+    if (typeof window !== 'undefined') {
+      const savedPassword = sessionStorage.getItem('admin_password');
+      if (savedPassword) {
+        setPassword(savedPassword);
+        // Auto-login with saved password
+        const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'admin123';
+        if (savedPassword === ADMIN_PASSWORD) {
+          setIsAuthenticated(true);
+        }
+      }
+    }
+  }, []);
+
   useEffect(() => {
     if (isAuthenticated) {
       fetchData();
@@ -71,12 +86,32 @@ export default function Admin() {
   }, [isAuthenticated]);
 
   // Verify admin password
-  const verifyPassword = async () => {
+const verifyPassword = async () => {
     if (!password.trim()) {
       showMessage("Please enter admin password", "error");
       return;
     }
 
+    // Simple password check - using the environment variable
+    const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'admin123';
+    
+    // Debug log (remove in production)
+    console.log("Entered password:", password.trim());
+    console.log("Expected password:", ADMIN_PASSWORD);
+    
+    if (password.trim() !== ADMIN_PASSWORD) {
+      showMessage("Incorrect admin password", "error");
+      return;
+    }
+    
+    setIsAuthenticated(true);
+    showMessage("Access granted", "success");
+    
+    // Store password in sessionStorage for later use
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('admin_password', password.trim());
+    }
+  };
     // Simple password check - no API call needed
     const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'admin123';
     
